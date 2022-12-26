@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
 const User = require('../models/user');
+const Post = require("../models/post");
 
 exports.signup = (req, res, next) => {
   const errors = validationResult(req);
@@ -25,7 +26,7 @@ exports.signup = (req, res, next) => {
             return user.save();
         })
         .then(result => {
-            res.status(201).json({message: 'User created', userId: result._i})
+            res.status(201).json({message: 'User created', userId: result._id});
         })
         .catch(err => {
         if(!err.statusCode){
@@ -72,4 +73,70 @@ exports.login = (req, res, next) => {
             }
             next(err);
         })
+};
+
+exports.getPosts = (req, res, next) => {
+    const currentPage = req.query.page || 1;
+    const perPage = 2;
+    let totalItems;
+    Post.find()
+        .countDocuments()
+        .then(count => {
+            totalItems = count;
+            return  Post.find()
+                .skip((currentPage - 1) * perPage)
+                .limit(perPage);
+        })
+        .then(posts => {
+            res.status(200).json({
+                message: 'Posts fetched successfully!',
+                posts: posts,
+                totalItems: totalItems
+            });
+        })
+        .catch(err => {
+            if(!err.statusCode){
+                err.statusCode = 500;
+            }
+            next(err);
+        })
+};
+
+exports.getUserStatus = (req, res, next) => {
+    User.findById(req.userId)
+        .then(user => {
+            if(!user) {
+                const error = new Error('User not found!');
+                error.statusCode = 404;
+                throw error;
+            }
+            res.status(200).json({ status: user.status });
+        }).catch(err => {
+            if(!err.statusCode) {
+                err.statusCode = 500;
+            }
+            next(err);
+    });
+};
+
+exports.updateUserStatus = (req, res, next) => {
+    const newStatus = req.body.status;
+    User.findById(req.userId).then(user => {
+        if(!user) {
+            const error = new Error('User not found!');
+            error.statusCode = 404;
+            throw error;
+        }
+        user.status = newStatus;
+        return user.save();
+    })
+        .then(result => {
+            res.status(200).json({message: 'User updated!'});
+        })
+        .catch(err => {
+            if(!err.statusCode) {
+                err.statusCode = 500;
+            }
+            next(err);
+        });
 };
