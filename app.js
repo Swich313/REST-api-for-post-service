@@ -6,6 +6,7 @@ const path = require('path');
 const multer = require('multer');
 const {graphqlHTTP}  = require('express-graphql');
 const { v4: uuidv4 } = require('uuid');
+const socketServer = require('./socket');
 
 const graphqlSchema = require('./graphql/schema');
 const graphqlResolver = require('./graphql/resolvers');
@@ -95,11 +96,15 @@ app.use((error, req, res, next) => {
 mongoose.set('strictQuery', true);
 mongoose.connect(process.env.MONGO_DB_CONNECTION)
     .then(result => {
-            app.listen(PORT,
+            const server = app.listen(PORT,
             //hostname,
             () => {
                 console.log(`Server is running at http://localhost:${PORT}`)
                 //console.log(`Server is running at http://${hostname}:${PORT}`);
+            });
+            const io = socketServer.init(server);
+            io.on('connection', socket => {
+                console.log('Client connected');
             });
     })
     .catch(err => console.log(err))

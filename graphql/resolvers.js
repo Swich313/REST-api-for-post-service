@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const validator = require('validator');
 const jwt = require('jsonwebtoken');
+const io = require('../socket');
 
 const User = require('../models/user');
 const Post = require('../models/post');
@@ -91,6 +92,10 @@ module.exports = {
         const createdPost = await post.save();
         user.posts.push(createdPost);
         await user.save();
+        io.getIO().emit('posts', {
+            action: 'create',
+            post: {...post.toJSON(), creator: {_id: req.userId, name: user.name}}  //...post._doc can be used instead
+        });
         return {
             ...createdPost._doc,
             _id: createdPost._id.toString(),
@@ -181,6 +186,7 @@ module.exports = {
             post.imageUrl = postInput.imageUrl;
         }
         const updatedPost = await post.save();
+        io.getIO().emit('posts', {action: 'update', post: updatedPost});
         return {...updatedPost._doc,
         _id: updatedPost._id.toString(),
         createdAt: updatedPost.createdAt.toISOString(),
@@ -208,6 +214,7 @@ module.exports = {
         const user = await User.findById(req.userId);
         user.posts.pull(id);
         await user.save();
+        io.getIO().emit('posts', {action: 'delete', post: id});
         return true;
     },
     user: async function(args, req){
@@ -230,16 +237,6 @@ module.exports = {
             error.code = 401;
             throw error;
         }
-        const errors = [];
-        // if(validator.isEmpty(status) || !validator.isLength(status, {min: 3})){
-        //     errors.push({message: 'Status is invalid!'});
-        // }
-        // if(errors.length > 0) {
-        //     const error = new Error('Invalid input!')
-        //     error.data = errors;
-        //     error.code = 422;
-        //     throw error;
-        // }
         const user = await User.findById(req.userId);
         if (!user) {
             const error = new Error('User not found!');
